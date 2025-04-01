@@ -2,6 +2,10 @@
 
 A modern, interactive casino website built with React and TypeScript, offering a variety of classic casino games with virtual coins.
 
+## 🚀 Live Demo
+
+Check out the live demo: [https://gamedevteam321.github.io/neo-vegas/](https://gamedevteam321.github.io/neo-vegas/)
+
 ## 🎮 Available Games
 
 - **Dragon Tower**: Climb the tower for higher multipliers while avoiding dragons
@@ -28,6 +32,20 @@ A modern, interactive casino website built with React and TypeScript, offering a
 - Radix UI Components
 - React Router
 - React Query
+
+## 🚢 Deployment
+
+The project is automatically deployed to GitHub Pages using GitHub Actions. Any push to the `main` branch triggers the deployment workflow:
+
+1. The workflow builds the project using `npm run build`
+2. The built files are pushed to the `gh-pages` branch
+3. GitHub Pages serves the content from the `gh-pages` branch
+
+To manually deploy:
+
+```bash
+npm run deploy
+```
 
 ## 🎯 Getting Started
 
