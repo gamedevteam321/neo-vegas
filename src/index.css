@@ -1,0 +1,183 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 291 84% 58%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 226 16% 14%;
+    --foreground: 259 96% 94%;
+
+    --card: 226 18% 20%;
+    --card-foreground: 259 96% 94%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 291 84% 58%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .game-card {
+    @apply bg-casino-card rounded-xl p-4 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl overflow-hidden border border-transparent hover:border-casino-primary cursor-pointer;
+  }
+  
+  .game-card-title {
+    @apply text-xl font-bold text-white mb-2;
+  }
+  
+  .neon-button {
+    @apply bg-casino-primary hover:bg-opacity-90 text-white py-2 px-6 rounded-lg transition-all duration-300 hover:shadow-[0_0_15px_rgba(139,92,246,0.8)] font-medium;
+  }
+  
+  .coin-display {
+    @apply flex items-center gap-2 bg-casino-card px-4 py-2 rounded-full text-white font-medium;
+  }
+  
+  .game-layout {
+    @apply container mx-auto py-8 px-4 max-w-6xl;
+  }
+  
+  .game-title {
+    @apply text-3xl font-bold mb-6 text-white;
+  }
+  
+  .control-panel {
+    @apply bg-casino-card rounded-xl p-6 mb-6;
+  }
+}
+
+/* Responsive text sizes */
+@layer utilities {
+  .text-responsive-4xl {
+    @apply text-2xl md:text-3xl lg:text-4xl;
+  }
+  .text-responsive-2xl {
+    @apply text-xl md:text-2xl;
+  }
+  .text-responsive-xl {
+    @apply text-lg md:text-xl;
+  }
+}
+
+/* Game card responsive styles */
+.game-card {
+  @apply transform transition-all duration-200 hover:scale-[1.02];
+}
+
+.game-card-title {
+  @apply text-responsive-xl font-semibold text-white mb-2;
+}
+
+/* Coin display responsive styles */
+.coin-display {
+  @apply flex items-center gap-2 bg-casino-card px-3 py-1.5 rounded-full text-white;
+  @apply text-sm md:text-base;
+}
+
+/* Container padding responsive */
+.container {
+  @apply px-4 md:px-6 lg:px-8;
+}
+
+/* Button responsive sizes */
+.btn-responsive {
+  @apply px-3 py-1.5 md:px-4 md:py-2;
+}
+
+/* Game interface responsive layout */
+.game-interface {
+  @apply flex flex-col md:flex-row gap-4 md:gap-8;
+}
+
+.game-controls {
+  @apply w-full md:w-1/3 space-y-4;
+}
+
+.game-display {
+  @apply w-full md:w-2/3;
+}
