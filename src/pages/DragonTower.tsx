@@ -3,6 +3,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { useCoins } from '@/contexts/CoinContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useNavigate } from 'react-router-dom';
 import { 
   Trophy, 
   ArrowRight, 
@@ -63,8 +64,8 @@ const DIFFICULTY_PRESETS = {
 type DifficultyKey = keyof typeof DIFFICULTY_PRESETS;
 
 const DragonTower = () => {
-  const { coins, updateCoins } = useCoins();
-  const [betAmount, setBetAmount] = useState(100);
+  const { coins, isGuest, removeCoins, addCoins } = useCoins();
+  const [betAmount, setBetAmount] = useState(0);
   const [difficulty, setDifficulty] = useState<DifficultyKey>("medium");
   const [gameActive, setGameActive] = useState(false);
   const [currentLevel, setCurrentLevel] = useState(0);
@@ -75,6 +76,7 @@ const DragonTower = () => {
   const [win, setWin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const actionCompletedRef = useRef(false);
+  const navigate = useNavigate();
   
   // Reset game state when component unmounts or page reloads
   useEffect(() => {
@@ -128,67 +130,98 @@ const DragonTower = () => {
     setTimeout(() => {
       setIsLoading(true);
       
-      if (betAmount <= 0) {
-        toast({
-          title: "Invalid bet amount",
-          description: "Please enter a bet amount greater than 0",
-          variant: "destructive",
-        });
+      // For guest mode, only allow playing with 0 bet
+      if (isGuest && betAmount > 0) {
+        if (window.confirm('Please sign up to play with coins!')) {
+          navigate('/login');
+        }
+        setBetAmount(0);
         setIsLoading(false);
         return;
       }
-      
-      if (betAmount > coins) {
-        toast({
-          title: "Insufficient funds",
-          description: "You don't have enough coins for this bet",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-      
-      // Deduct bet amount
-      updateCoins(-betAmount);
-      
-      const difficultySettings = DIFFICULTY_PRESETS[difficulty];
-      const columns = difficultySettings.columns;
-      
-      // Generate dragon position for each row (only one dragon per row)
-      const dragonPositions = Array(MAX_ROWS)
-        .fill(0)
-        .map(() => Math.floor(Math.random() * columns));
-      
-      // Initialize tiles with dragons (0 = safe, 1 = dragon)
-      const newTiles = Array(MAX_ROWS)
-        .fill(0)
-        .map((_, rowIndex) => {
-          return Array(columns).fill(0).map((_, colIndex) => {
-            return colIndex === dragonPositions[rowIndex] ? 1 : 0;
+
+      // For non-guest mode, check bet amount
+      if (!isGuest) {
+        if (betAmount <= 0) {
+          toast({
+            title: "Invalid bet amount",
+            description: "Please enter a bet amount greater than 0",
+            variant: "destructive",
           });
+          setIsLoading(false);
+          return;
+        }
+        
+        if (betAmount > coins) {
+          toast({
+            title: "Insufficient funds",
+            description: "You don't have enough coins for this bet",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // Deduct bet amount only for non-guest users
+        removeCoins(betAmount);
+        
+        // Show coin deduction message
+        toast({
+          title: "Bet Placed",
+          description: `-${formatCoins(betAmount)} coins`,
+          duration: 3000,
         });
+      }
       
-      // Initialize revealed state for all tiles (all hidden)
-      const newRevealedTiles = Array(MAX_ROWS)
-        .fill(0)
-        .map(() => Array(columns).fill(false));
+      // Start the game
+      setGameActive(true);
+      setIsLoading(false);
+      
+      // Generate game board
+      const difficultySettings = DIFFICULTY_PRESETS[difficulty];
+      const { columns, dragonCount } = difficultySettings;
+      
+      // Initialize tiles and revealed tiles arrays
+      const newTiles: number[][] = [];
+      const newRevealedTiles: boolean[][] = [];
+      
+      // Generate board for each row
+      for (let row = 0; row < MAX_ROWS; row++) {
+        const rowTiles = Array(columns).fill(0);
+        const rowRevealed = Array(columns).fill(false);
+        
+        // Place dragons
+        let dragonsPlaced = 0;
+        while (dragonsPlaced < dragonCount) {
+          const randomCol = Math.floor(Math.random() * columns);
+          if (rowTiles[randomCol] === 0) {
+            rowTiles[randomCol] = 1;
+            dragonsPlaced++;
+          }
+        }
+        
+        newTiles.push(rowTiles);
+        newRevealedTiles.push(rowRevealed);
+      }
       
       setTiles(newTiles);
       setRevealedTiles(newRevealedTiles);
-      setCurrentLevel(0);
-      setGameActive(true);
-      setIsGameOver(false);
-      setWin(false);
-      
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 200);
     }, 100);
   };
   
   // Handle tile click
   const handleTileClick = (rowIndex: number, colIndex: number) => {
     if (!gameActive || isGameOver || isLoading || revealedTiles[rowIndex][colIndex]) return;
+    
+    // Only allow clicking tiles in the current row
+    if (rowIndex !== currentLevel) {
+      toast({
+        title: "Invalid Move",
+        description: "You can only click tiles in the current row.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsLoading(true);
     
@@ -209,6 +242,11 @@ const DragonTower = () => {
 
         setIsGameOver(true);
         setWin(false);
+        
+        // Deduct bet amount when hitting a dragon
+        if (!isGuest) {
+          removeCoins(betAmount);
+        }
         
         toast({
           title: "Game Over!",
@@ -242,7 +280,9 @@ const DragonTower = () => {
         // Check if player reached the top
         if (newLevel >= MAX_ROWS) {
           const winAmount = Math.floor(betAmount * multipliers[MAX_ROWS - 1]);
-          updateCoins(winAmount);
+          if (!isGuest) {
+            addCoins(winAmount);
+          }
           setIsGameOver(true);
           setWin(true);
           
@@ -286,7 +326,9 @@ const DragonTower = () => {
       if (actionCompletedRef.current) return;
       actionCompletedRef.current = true;
 
-      updateCoins(winAmount);
+      if (!isGuest) {
+        addCoins(winAmount);
+      }
       
       // Reveal all tiles in all rows
       const finalRevealedTiles = [...revealedTiles];
@@ -323,6 +365,21 @@ const DragonTower = () => {
   const handleDifficultyChange = (value: DifficultyKey) => {
     setDifficulty(value);
   };
+
+  const handleBetChange = (value: string) => {
+    const newBet = parseInt(value) || 0;
+    
+    // If guest tries to bet more than 0, show signup prompt
+    if (isGuest && newBet > 0) {
+      if (window.confirm('Please sign up to play with coins!')) {
+        navigate('/login');
+      }
+      setBetAmount(0);
+      return;
+    }
+    
+    setBetAmount(newBet);
+  };
   
   return (
     <MainLayout>
@@ -337,8 +394,9 @@ const DragonTower = () => {
                 <div className="flex gap-2">
                   <Input
                     type="number"
+                    min={0}
                     value={betAmount}
-                    onChange={(e) => setBetAmount(parseInt(e.target.value) || 0)}
+                    onChange={(e) => handleBetChange(e.target.value)}
                     className="bg-casino-background border-casino-muted text-white"
                     disabled={gameActive && !isGameOver}
                   />
@@ -346,8 +404,8 @@ const DragonTower = () => {
                     variant="outline"
                     size="icon"
                     className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20"
-                    onClick={() => setBetAmount(Math.max(0, Math.floor(betAmount / 2)))}
-                    disabled={betAmount <= 10 || (gameActive && !isGameOver)}
+                    onClick={() => handleBetChange((betAmount / 2).toString())}
+                    disabled={betAmount <= 0 || (gameActive && !isGameOver)}
                   >
                     ½
                   </Button>
@@ -355,7 +413,7 @@ const DragonTower = () => {
                     variant="outline"
                     size="icon"
                     className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20"
-                    onClick={() => setBetAmount(Math.min(coins, betAmount * 2))}
+                    onClick={() => handleBetChange((betAmount * 2).toString())}
                     disabled={betAmount * 2 > coins || (gameActive && !isGameOver)}
                   >
                     2×
@@ -401,12 +459,12 @@ const DragonTower = () => {
               
               {/* Game controls that change based on game state */}
               {!gameActive ? (
-                <Button 
-                  className="neon-button w-full" 
+                <Button
                   onClick={startGame}
-                  disabled={betAmount <= 0 || betAmount > coins}
+                  disabled={gameActive || isLoading || (!isGuest && (betAmount <= 0 || betAmount > coins))}
+                  className="w-full bg-[#7c3bed] hover:bg-[#7c3bed]/90 text-white"
                 >
-                  <Play className="mr-2" size={16} />
+                  <Play className="w-4 h-4 mr-2" />
                   Start Game
                 </Button>
               ) : (
