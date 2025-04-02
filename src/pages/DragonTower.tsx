@@ -131,14 +131,17 @@ const DragonTower = () => {
       setIsLoading(true);
       
       // For guest mode, only allow playing with 0 bet
-      if (isGuest && betAmount > 0) {
-        if (window.confirm('Please sign up to play with coins!')) {
-          navigate('/login');
-        }
-        setBetAmount(0);
-        setIsLoading(false);
-        return;
-      }
+    if (isGuest && betAmount > 0) {
+      setBetAmount(0);
+      toast({
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
+        duration: 3000,
+      });
+      navigate("/login");
+      return;
+    }
 
       // For non-guest mode, check bet amount
       if (!isGuest) {
@@ -368,16 +371,17 @@ const DragonTower = () => {
 
   const handleBetChange = (value: string) => {
     const newBet = parseInt(value) || 0;
-    
-    // If guest tries to bet more than 0, show signup prompt
     if (isGuest && newBet > 0) {
-      if (window.confirm('Please sign up to play with coins!')) {
-        navigate('/login');
-      }
       setBetAmount(0);
+      toast({
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
+        duration: 3000,
+      });
+      navigate("/login");
       return;
     }
-    
     setBetAmount(newBet);
   };
   

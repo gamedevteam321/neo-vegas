@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from "@/components/ui/use-toast";
 import { formatCoins } from '@/utils/coinManager';
+import { useNavigate } from 'react-router-dom';
 
 // Constants
 const GRID_SIZE = 25; // 5x5 grid
@@ -22,8 +23,8 @@ const MIN_MINES = 1;
 const MAX_MINES = 24;
 
 const Mines = () => {
-  const { coins, updateCoins } = useCoins();
-  const [betAmount, setBetAmount] = useState(100);
+  const { coins, isGuest, removeCoins, addCoins } = useCoins();
+  const [betAmount, setBetAmount] = useState(0);
   const [mineCount, setMineCount] = useState(5);
   const [gameActive, setGameActive] = useState(false);
   const [grid, setGrid] = useState<Array<number>>([]);
@@ -37,6 +38,7 @@ const Mines = () => {
   const [autoTarget, setAutoTarget] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
   const actionCompletedRef = useRef(false);
+  const navigate = useNavigate();
   
   // Calculate the next tile multiplier based on current state
   useEffect(() => {
@@ -52,7 +54,7 @@ const Mines = () => {
       setIsGameOver(true);
       setWin(true);
       const finalWin = Math.floor(betAmount * currentMultiplier);
-      updateCoins(finalWin);
+      addCoins(finalWin);
       toast({
         title: "Congratulations!",
         description: `You found all gems and won ${formatCoins(finalWin)} coins!`,
@@ -64,37 +66,60 @@ const Mines = () => {
     const odds = (remainingSafeTiles) / (GRID_SIZE - revealedCount);
     const nextMult = Number((currentMultiplier * (1 / odds)).toFixed(2));
     setNextMultiplier(nextMult);
-  }, [revealed, gameActive, mineCount, currentMultiplier, betAmount, updateCoins]);
+  }, [revealed, gameActive, mineCount, currentMultiplier, betAmount, addCoins]);
   
   // Start a new game
   const startGame = () => {
     setIsLoading(true);
     
-    if (betAmount <= 0) {
+    // For guest mode, only allow playing with 0 bet
+    if (isGuest && betAmount > 0) {
+      setBetAmount(0);
       toast({
-        title: "Invalid bet amount",
-        description: "Please enter a bet amount greater than 0",
-        variant: "destructive",
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
       });
+      navigate("/login");
       setIsLoading(false);
       return;
     }
-    
-    if (betAmount > coins) {
+
+    // For non-guest mode, check bet amount
+    if (!isGuest) {
+      if (betAmount <= 0) {
+        toast({
+          title: "Invalid bet amount",
+          description: "Please enter a bet amount greater than 0",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      if (betAmount > coins) {
+        toast({
+          title: "Insufficient funds",
+          description: "You don't have enough coins for this bet",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Deduct bet amount only for non-guest users
+      removeCoins(betAmount);
+      
+      // Show coin deduction message
       toast({
-        title: "Insufficient funds",
-        description: "You don't have enough coins for this bet",
-        variant: "destructive",
+        title: "Bet Placed",
+        description: `-${formatCoins(betAmount)} coins`,
+        duration: 3000,
       });
-      setIsLoading(false);
-      return;
     }
     
     // Reset completion guard
     actionCompletedRef.current = false;
-    
-    // Deduct bet amount
-    updateCoins(-betAmount);
     
     // Create a grid of 25 tiles (0 = gem, 1 = mine)
     const newGrid = Array(GRID_SIZE).fill(0);
@@ -180,7 +205,7 @@ const Mines = () => {
         if (revealedSafeTiles === safeTiles) {
           // Player has revealed all safe tiles - they win!
           const finalWin = Math.floor(betAmount * nextMultiplier);
-          updateCoins(finalWin);
+          addCoins(finalWin);
           setIsGameOver(true);
           setWin(true);
           setIsAutoMode(false);
@@ -234,7 +259,7 @@ const Mines = () => {
       actionCompletedRef.current = true;
 
       const winAmount = Math.floor(betAmount * currentMultiplier);
-      updateCoins(winAmount);
+      addCoins(winAmount);
       
       // Reveal all mines
       const finalRevealed = grid.map((tile, i) => {
@@ -274,6 +299,24 @@ const Mines = () => {
   // Calculate probability of next safe click
   const safeProb = Math.floor(((GRID_SIZE - mineCount - openedSafeTiles) / (GRID_SIZE - openedSafeTiles)) * 100);
   
+  const handleBetChange = (value: string) => {
+    const newBet = parseInt(value) || 0;
+    
+    // If guest tries to bet more than 0, show signup prompt
+    if (isGuest && newBet > 0) {
+      setBetAmount(0);
+      toast({
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
+      });
+      navigate("/login");
+      return;
+    }
+    
+    setBetAmount(newBet);
+  };
+  
   return (
     <MainLayout>
       <div className="game-layout">
@@ -288,7 +331,7 @@ const Mines = () => {
                   <Input
                     type="number"
                     value={betAmount}
-                    onChange={(e) => setBetAmount(parseInt(e.target.value) || 0)}
+                    onChange={(e) => handleBetChange(e.target.value)}
                     className="bg-casino-background border-casino-muted text-white"
                     disabled={gameActive && !isGameOver}
                   />
@@ -297,7 +340,7 @@ const Mines = () => {
                     size="icon"
                     className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20"
                     onClick={() => setBetAmount(Math.max(0, Math.floor(betAmount / 2)))}
-                    disabled={betAmount <= 10 || (gameActive && !isGameOver)}
+                    disabled={betAmount <= 0 || (gameActive && !isGameOver)}
                   >
                     ½
                   </Button>
@@ -349,7 +392,7 @@ const Mines = () => {
                 <Button 
                   className="neon-button w-full" 
                   onClick={startGame}
-                  disabled={betAmount <= 0 || betAmount > coins || isLoading}
+                  disabled={isLoading || (!isGuest && (betAmount <= 0 || betAmount > coins))}
                 >
                   <Play className="mr-2 w-4 h-4" />
                   Start Game

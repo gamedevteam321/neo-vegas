@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { formatCoins } from '@/utils/coinManager';
 import { 
   Dice3, 
   ArrowDown, 
@@ -15,20 +16,24 @@ import {
   Calculator,
   Trophy,
   X,
-  HelpCircle
+  HelpCircle,
+  Play
 } from 'lucide-react';
 import { toast } from "@/components/ui/use-toast";
+import { useNavigate } from 'react-router-dom';
 
 const DiceGame = () => {
-  const { coins, updateCoins } = useCoins();
-  const [betAmount, setBetAmount] = useState(100);
+  const { coins, isGuest, removeCoins, addCoins } = useCoins();
+  const [betAmount, setBetAmount] = useState(0);
   const [targetNumber, setTargetNumber] = useState(50);
   const [isRollOver, setIsRollOver] = useState(true);
   const [gameActive, setGameActive] = useState(false);
   const [isRolling, setIsRolling] = useState(false);
   const [result, setResult] = useState<number | null>(null);
   const [win, setWin] = useState(false);
+  const [isGameOver, setIsGameOver] = useState(false);
   const rollCompletedRef = useRef(false);
+  const navigate = useNavigate();
   
   // Calculate win chance and multiplier based on current settings
   const winChance = isRollOver 
@@ -46,6 +51,21 @@ const DiceGame = () => {
   
   const formatNumber = (num: number): string => {
     return num.toFixed(2);
+  };
+  
+  const handleBetChange = (value: string) => {
+    const newBet = parseInt(value) || 0;
+    if (isGuest && newBet > 0) {
+      setBetAmount(0);
+      toast({
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
+      });
+      navigate("/login");
+      return;
+    }
+    setBetAmount(newBet);
   };
   
   const placeBet = () => {
@@ -71,7 +91,7 @@ const DiceGame = () => {
     rollCompletedRef.current = false;
     
     // Deduct bet amount
-    updateCoins(-betAmount);
+    removeCoins(betAmount);
     
     // Set game as active and start rolling animation
     setGameActive(true);
@@ -99,7 +119,7 @@ const DiceGame = () => {
       // Award winnings if player won
       if (isWin) {
         const winAmount = potentialWin;
-        updateCoins(winAmount);
+        addCoins(winAmount);
         
         toast({
           title: "You Win!",
@@ -138,6 +158,102 @@ const DiceGame = () => {
     setIsRollOver(!isRollOver);
   };
   
+  const startGame = () => {
+    // For guest mode, only allow playing with 0 bet
+    if (isGuest && betAmount > 0) {
+      setBetAmount(0);
+      toast({
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
+      });
+      navigate("/login");
+      return;
+    }
+
+    // For non-guest mode, check bet amount
+    if (!isGuest) {
+      if (betAmount <= 0) {
+        toast({
+          title: "Invalid bet amount",
+          description: "Please enter a bet amount greater than 0",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (betAmount > coins) {
+        toast({
+          title: "Insufficient funds",
+          description: "You don't have enough coins for this bet",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Deduct bet amount only for non-guest users
+      removeCoins(betAmount);
+      
+      // Show coin deduction message
+      toast({
+        title: "Bet Placed",
+        description: `-${formatCoins(betAmount)} coins`,
+        duration: 3000,
+      });
+    }
+    
+    // Reset completion guard
+    rollCompletedRef.current = false;
+    
+    // Set game as active and start rolling animation
+    setGameActive(true);
+    setIsRolling(true);
+    setResult(null);
+    setWin(false);
+    
+    // Simulate the roll with a delay for animation
+    setTimeout(() => {
+      // Guard against multiple completions
+      if (rollCompletedRef.current) return;
+      rollCompletedRef.current = true;
+
+      // Generate a random number between 0 and 100
+      const rollResult = parseFloat((Math.random() * 100).toFixed(2));
+      setResult(rollResult);
+      
+      // Determine if player won based on roll and bet type
+      const isWin = isRollOver 
+        ? rollResult > targetNumber 
+        : rollResult < targetNumber;
+      
+      setWin(isWin);
+      
+      // Award winnings if player won and not in guest mode
+      if (isWin && !isGuest) {
+        const winAmount = potentialWin;
+        addCoins(winAmount);
+        
+        toast({
+          title: "You Win!",
+          description: `You won ${winAmount} coins!`,
+        });
+      } else if (isWin) {
+        toast({
+          title: "You Win!",
+          description: "Sign up to win real coins!",
+        });
+      } else {
+        toast({
+          title: "You Lost",
+          description: "Better luck next time!",
+          variant: "destructive",
+        });
+      }
+      
+      setIsRolling(false);
+    }, 1500);
+  };
+  
   return (
     <MainLayout>
       <div className="game-layout">
@@ -152,16 +268,16 @@ const DiceGame = () => {
                   <Input
                     type="number"
                     value={betAmount}
-                    onChange={(e) => setBetAmount(parseInt(e.target.value) || 0)}
+                    onChange={(e) => handleBetChange(e.target.value)}
                     className="bg-casino-background border-casino-muted text-white"
-                    disabled={gameActive && isRolling}
+                    disabled={gameActive && !isGameOver}
                   />
                   <Button
                     variant="outline"
                     size="icon"
                     className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20"
                     onClick={() => setBetAmount(Math.max(0, Math.floor(betAmount / 2)))}
-                    disabled={betAmount <= 10 || (gameActive && isRolling)}
+                    disabled={betAmount <= 0 || (gameActive && !isGameOver)}
                   >
                     ½
                   </Button>
@@ -170,7 +286,7 @@ const DiceGame = () => {
                     size="icon"
                     className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20"
                     onClick={() => setBetAmount(Math.min(coins, betAmount * 2))}
-                    disabled={betAmount * 2 > coins || (gameActive && isRolling)}
+                    disabled={betAmount * 2 > coins || (gameActive && !isGameOver)}
                   >
                     2×
                   </Button>
@@ -248,11 +364,11 @@ const DiceGame = () => {
               {!gameActive ? (
                 <Button 
                   className="neon-button w-full" 
-                  onClick={placeBet}
-                  disabled={betAmount <= 0 || betAmount > coins || isRolling}
+                  onClick={startGame}
+                  disabled={isRolling || (!isGuest && (betAmount <= 0 || betAmount > coins))}
                 >
-                  <Dice3 className="mr-2 w-4 h-4" />
-                  Roll Dice
+                  <Play className="mr-2" size={16} />
+                  Start Game
                 </Button>
               ) : (
                 <Button 

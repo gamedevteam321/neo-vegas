@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { formatCoins } from '@/utils/coinManager';
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNavigate } from 'react-router-dom';
 
 // Game configuration
 const DIFFICULTY_PRESETS = {
@@ -213,8 +214,8 @@ const createWheelSegments = (difficulty: DifficultyKey, numSegments: number) => 
 };
 
 const Wheel = () => {
-  const { coins, updateCoins } = useCoins();
-  const [betAmount, setBetAmount] = useState(100);
+  const { coins, isGuest, removeCoins, addCoins } = useCoins();
+  const [betAmount, setBetAmount] = useState(0);
   const [difficulty, setDifficulty] = useState<DifficultyKey>("medium");
   const [isSpinning, setIsSpinning] = useState(false);
   const [numSegments, setNumSegments] = useState(DIFFICULTY_PRESETS.medium.defaultSegments);
@@ -224,7 +225,9 @@ const Wheel = () => {
   const [recentMultipliers, setRecentMultipliers] = useState<Array<{ label: string; color: string }>>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameActive, setGameActive] = useState(true);
+  const [isGameOver, setIsGameOver] = useState(false);
   const spinCompletedRef = useRef(false);
+  const navigate = useNavigate();
 
   // Update segments when difficulty or number of segments changes
   useEffect(() => {
@@ -280,8 +283,9 @@ const Wheel = () => {
     // Draw outer ring with color segments
     const segmentAngle = (2 * Math.PI) / segments.length;
     segments.forEach((segment, index) => {
-      const startAngle = index * segmentAngle + (rotation * Math.PI / 180) - Math.PI / 2 + segmentAngle / 2;
-      const endAngle = (index + 1) * segmentAngle + (rotation * Math.PI / 180) - Math.PI / 2 + segmentAngle / 2;
+      // Adjust the angle calculation to align with the pointer
+      const startAngle = index * segmentAngle + (rotation * Math.PI / 180) - Math.PI / 2;
+      const endAngle = (index + 1) * segmentAngle + (rotation * Math.PI / 180) - Math.PI / 2;
 
       // Draw outer colored ring
       ctx.beginPath();
@@ -330,32 +334,73 @@ const Wheel = () => {
     setDifficulty(value);
   };
 
-  const spinWheel = () => {
-    if (isSpinning) return;
-    
-    if (betAmount <= 0) {
+  const handleBetChange = (value: string) => {
+    const newBet = parseInt(value) || 0;
+    if (isGuest && newBet > 0) {
+      setBetAmount(0);
       toast({
-        title: "Invalid bet amount",
-        description: "Please enter a bet amount greater than 0",
-        variant: "destructive",
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
+        duration: 3000,
       });
+      navigate("/login");
       return;
     }
+    setBetAmount(newBet);
+  };
+
+  const startGame = () => {
+    if (isSpinning) return;
     
-    if (betAmount > coins) {
+    // For guest mode, only allow playing with 0 bet
+    if (isGuest && betAmount > 0) {
+      setBetAmount(0);
       toast({
-        title: "Insufficient funds",
-        description: "You don't have enough coins for this bet",
-        variant: "destructive",
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
+        duration: 3000,
       });
+      navigate("/login");
       return;
+    }
+
+    // For non-guest mode, check bet amount
+    if (!isGuest) {
+      if (betAmount <= 0) {
+        toast({
+          title: "Invalid bet amount",
+          description: "Please enter a bet amount greater than 0",
+          variant: "destructive",
+          duration: 3000,
+        });
+        return;
+      }
+      
+      if (betAmount > coins) {
+        toast({
+          title: "Insufficient funds",
+          description: "You don't have enough coins for this bet",
+          variant: "destructive",
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Deduct bet amount only for non-guest users
+      removeCoins(betAmount);
+      
+      // Show coin deduction message
+      toast({
+        title: "Bet Placed",
+        description: `-${formatCoins(betAmount)} coins`,
+        duration: 3000,
+      });
     }
 
     // Reset completion guard
     spinCompletedRef.current = false;
-
-    // Deduct bet amount
-    updateCoins(-betAmount);
     
     setIsSpinning(true);
     setResult(null);
@@ -366,60 +411,78 @@ const Wheel = () => {
     
     // Calculate final rotation to land on result
     const segmentAngle = 360 / segments.length;
-    const extraSpins = 4; // Number of full rotations
-    const finalRotation = 360 * extraSpins + (segmentAngle * resultIndex);
+    const extraSpins = 4;
+    // Adjust the final rotation to align the pointer with the middle of the segment
+    const finalRotation = 360 * extraSpins + (360 - (resultIndex * segmentAngle) - (segmentAngle / 2));
     
-    // Store the winning segment for later use
-    const winningSegment = segments[segments.length - resultIndex - 1];
+    // Set the result immediately
+    setResult(resultIndex);
     
-    // Animate the spin
-    let currentRotation = rotation;
+    // Animate wheel with easing
+    let currentRotation = 0;
+    const duration = 4000; // 4 seconds
+    const startTime = Date.now();
+    
     const animate = () => {
-      const remaining = finalRotation - currentRotation;
-      if (remaining <= 0) {
-        // Guard against multiple completions
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing function for smooth deceleration
+      const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+      currentRotation = finalRotation * easeOut(progress);
+      
+      setRotation(currentRotation);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Animation complete
         if (spinCompletedRef.current) return;
         spinCompletedRef.current = true;
         
         setIsSpinning(false);
         
-        // Calculate winnings using the stored winning segment
-        const winAmount = Math.floor(betAmount * winningSegment.multiplier);
-        
-        // Update recent multipliers only after wheel stops
+        // Update recent multipliers history
         setRecentMultipliers(prev => {
-          const updated = [{ 
-            label: winningSegment.label, 
-            color: winningSegment.color 
-          }, ...prev];
-          return updated.slice(0, 5); // Keep only last 5 multipliers
+          const newHistory = [
+            { label: resultSegment.label, color: resultSegment.color },
+            ...prev
+          ].slice(0, 10); // Keep last 10 results
+          return newHistory;
         });
         
-        if (winAmount > 0) {
-          updateCoins(winAmount);
-          toast({
-            title: "You Win!",
-            description: `You won ${formatCoins(winAmount)} coins! (${winningSegment.label})`,
-          });
+        // Award winnings if not in guest mode
+        if (!isGuest) {
+          const winAmount = Math.floor(betAmount * resultSegment.multiplier);
+          addCoins(winAmount);
+          
+          if (winAmount > 0) {
+            toast({
+              title: "You Win!",
+              description: `+${formatCoins(winAmount)} coins`,
+              variant: "default",
+              duration: 3000,
+            });
+          } else {
+            toast({
+              title: "You Lost",
+              description: "Better luck next time!",
+              variant: "destructive",
+              duration: 3000,
+            });
+          }
         } else {
           toast({
-            title: "You Lost",
-            description: "Better luck next time!",
-            variant: "destructive",
+            title: "You Win!",
+            description: "Sign up to win real coins!",
+            variant: "default",
+            duration: 3000,
           });
         }
-        
-        setResult(resultIndex);
-        return;
       }
-      
-      const step = Math.max(1, remaining * 0.05);
-      currentRotation += step;
-      setRotation(currentRotation % 360);
-      requestAnimationFrame(animate);
     };
     
-    animate();
+    requestAnimationFrame(animate);
   };
 
   return (
@@ -437,25 +500,25 @@ const Wheel = () => {
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
-                  min={10}
-                  max={coins}
                   value={betAmount}
-                  onChange={(e) => setBetAmount(Number(e.target.value))}
+                  onChange={(e) => handleBetChange(e.target.value)}
                   className="bg-casino-background border-casino-muted text-white"
                   disabled={isSpinning}
                 />
-                <Button 
-                  variant="outline" 
-                  onClick={() => setBetAmount(Math.floor(betAmount / 2))}
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20"
-                  disabled={betAmount <= 10 || isSpinning}
+                  onClick={() => setBetAmount(Math.max(0, Math.floor(betAmount / 2)))}
+                  disabled={betAmount <= 0 || isSpinning}
                 >
                   ½
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setBetAmount(Math.min(betAmount * 2, coins))}
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20"
+                  onClick={() => setBetAmount(Math.min(coins, betAmount * 2))}
                   disabled={betAmount * 2 > coins || isSpinning}
                 >
                   2×
@@ -513,10 +576,11 @@ const Wheel = () => {
               </Select>
             </div>
 
+            {/* Game controls that change based on game state */}
             <Button 
               className="neon-button w-full" 
-              onClick={spinWheel}
-              disabled={isSpinning || betAmount <= 0 || betAmount > coins}
+              onClick={startGame}
+              disabled={isSpinning || (!isGuest && (betAmount <= 0 || betAmount > coins))}
             >
               {isSpinning ? (
                 <>
@@ -590,11 +654,17 @@ const Wheel = () => {
         <div className="grid grid-cols-2 gap-2 text-center">
           <div className="bg-casino-background p-2 rounded-lg">
             <p className="text-xs text-gray-400">Multiplier</p>
-            <p className="text-lg font-bold text-blue-400">{segments[result as number]?.label}</p>
+            <p className="text-lg font-bold text-blue-400">
+              {result !== null ? segments[result]?.label : 'N/A'}
+            </p>
           </div>
           <div className="bg-casino-background p-2 rounded-lg">
             <p className="text-xs text-gray-400">Potential Win</p>
-            <p className="text-lg font-bold text-green-400">{segments[result as number]?.multiplier ? Math.floor(betAmount * segments[result as number]?.multiplier) : 'N/A'}</p>
+            <p className="text-lg font-bold text-green-400">
+              {result !== null && segments[result]?.multiplier ? 
+                formatCoins(Math.floor(betAmount * segments[result].multiplier)) : 
+                'N/A'}
+            </p>
           </div>
         </div>
 
