@@ -20,7 +20,7 @@ interface MainLayoutProps {
 }
 
 const MainLayout = ({ children }: MainLayoutProps) => {
-  const { coins, resetCoins } = useCoins();
+  const { coins, resetCoins, isGuest } = useCoins();
   const location = useLocation();
   const isHome = location.pathname === '/';
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);

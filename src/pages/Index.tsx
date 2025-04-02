@@ -11,6 +11,7 @@ import {
   Target,
   Play,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const GameCard = ({ title, icon, description, to, comingSoon = false }: { 
   title: string; 
@@ -53,6 +54,8 @@ const GameCard = ({ title, icon, description, to, comingSoon = false }: {
 };
 
 const Index = () => {
+  const { user } = useAuth();
+
   return (
     <MainLayout>
       <div className="container mx-auto py-6 md:py-12">
@@ -113,6 +116,22 @@ const Index = () => {
             <p>5. You can reset your coins to 10,000 anytime using the reset button</p>
           </div>
         </div>
+
+        {user ? (
+          <div>
+            <p>Logged in as: {user.email}</p>
+            <Link to="/dragon-tower" className="text-blue-500 hover:underline">
+              Play Dragon Tower
+            </Link>
+          </div>
+        ) : (
+          <div>
+            <p>Please log in to play</p>
+            <Link to="/auth/login" className="text-blue-500 hover:underline">
+              Login
+            </Link>
+          </div>
+        )}
       </div>
     </MainLayout>
   );

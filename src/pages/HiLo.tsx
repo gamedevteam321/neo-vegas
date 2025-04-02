@@ -14,6 +14,7 @@ import {
   Check,
 } from 'lucide-react';
 import { toast } from "@/components/ui/use-toast";
+import { useNavigate } from 'react-router-dom';
 
 // Card types and interfaces
 interface Card {
@@ -57,12 +58,17 @@ const getPayoutOdds = (currentValue: number, direction: 'higher' | 'lower'): num
     ? 13 - currentValue
     : currentValue - 1;
   const probability = remaining / 12; // Exclude current value for fair odds
-  return +(1 / probability).toFixed(2);
+  return probability <= 0 ? 0 : +(1 / probability).toFixed(2);
+};
+
+// Format number for display
+const formatNumber = (num: number): string => {
+  return isNaN(num) ? '0' : num.toFixed(2);
 };
 
 const HiLo = () => {
-  const { coins, updateCoins } = useCoins();
-  const [betAmount, setBetAmount] = useState(100);
+  const { coins, isGuest, removeCoins, addCoins } = useCoins();
+  const [betAmount, setBetAmount] = useState(0);
   const [deck, setDeck] = useState<Card[]>(shuffleDeck(createDeck()));
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [nextCard, setNextCard] = useState<Card | null>(null);
@@ -73,32 +79,55 @@ const HiLo = () => {
   const [potentialWin, setPotentialWin] = useState(0);
   const [cardHistory, setCardHistory] = useState<Card[]>([]);
   const actionCompletedRef = useRef(false);
+  const navigate = useNavigate();
 
   // Start a new game
   const startGame = () => {
     // Reset completion guard
     actionCompletedRef.current = false;
 
-    if (betAmount <= 0) {
+    // For guest mode, only allow playing with 0 bet
+    if (isGuest && betAmount > 0) {
+      setBetAmount(0);
       toast({
-        title: "Invalid bet amount",
-        description: "Please enter a bet amount greater than 0",
-        variant: "destructive",
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
       });
-      return;
-    }
-    
-    if (betAmount > coins) {
-      toast({
-        title: "Insufficient funds",
-        description: "You don't have enough coins for this bet",
-        variant: "destructive",
-      });
+      navigate("/login");
       return;
     }
 
-    // Deduct bet amount
-    updateCoins(-betAmount);
+    // For non-guest mode, check bet amount
+    if (!isGuest) {
+      if (betAmount <= 0) {
+        toast({
+          title: "Invalid bet amount",
+          description: "Please enter a bet amount greater than 0",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (betAmount > coins) {
+        toast({
+          title: "Insufficient funds",
+          description: "You don't have enough coins for this bet",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Deduct bet amount only for non-guest users
+      removeCoins(betAmount);
+      
+      // Show coin deduction message
+      toast({
+        title: "Bet Placed",
+        description: `-${formatNumber(betAmount)} coins`,
+        duration: 3000,
+      });
+    }
     
     // Shuffle deck and draw first card
     const newDeck = shuffleDeck(createDeck());
@@ -113,6 +142,24 @@ const HiLo = () => {
     setCurrentMultiplier(1);
     setPotentialWin(0);
     setCardHistory([firstCard]);
+  };
+
+  const handleBetChange = (value: string) => {
+    const newBet = parseInt(value) || 0;
+    
+    // If guest tries to bet more than 0, show signup prompt
+    if (isGuest && newBet > 0) {
+      setBetAmount(0);
+      toast({
+        title: "Guest Mode",
+        description: "Please sign up to place bets and win real coins!",
+        variant: "default",
+      });
+      navigate("/login");
+      return;
+    }
+    
+    setBetAmount(newBet);
   };
 
   // Make a guess (higher or lower)
@@ -214,7 +261,7 @@ const HiLo = () => {
       actionCompletedRef.current = true;
 
       const winAmount = Math.floor(betAmount * currentMultiplier);
-      updateCoins(winAmount);
+      addCoins(winAmount);
       
       toast({
         title: "Cashed Out!",
@@ -311,25 +358,26 @@ const HiLo = () => {
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
-                  min={10}
-                  max={coins}
+                  min={0}
                   value={betAmount}
-                  onChange={(e) => setBetAmount(Number(e.target.value))}
+                  onChange={(e) => handleBetChange(e.target.value)}
                   className="bg-casino-background border-casino-muted text-white text-sm sm:text-base"
                   disabled={isGameActive}
                 />
-                <Button 
-                  variant="outline" 
-                  onClick={() => setBetAmount(Math.floor(betAmount / 2))}
-                  className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20 px-2 sm:px-3"
-                  disabled={betAmount <= 10 || isGameActive}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleBetChange((betAmount / 2).toString())}
+                  className="bg-casino-background border-casino-muted text-white hover:bg-casino-accent/20 px-2 sm:px-3"
+                  disabled={betAmount <= 0 || isGameActive}
                 >
                   ½
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setBetAmount(Math.min(betAmount * 2, coins))}
-                  className="text-white border-casino-muted bg-casino-background hover:bg-casino-accent/20 px-2 sm:px-3"
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleBetChange((betAmount * 2).toString())}
+                  className="bg-casino-background border-casino-muted text-white hover:bg-casino-accent/20 px-2 sm:px-3"
                   disabled={betAmount * 2 > coins || isGameActive}
                 >
                   2×
@@ -366,7 +414,7 @@ const HiLo = () => {
               <Button 
                 className="neon-button w-full py-2 sm:py-3 text-sm sm:text-base" 
                 onClick={startGame}
-                disabled={betAmount <= 0 || betAmount > coins}
+                disabled={!isGuest && (betAmount <= 0 || betAmount > coins)}
               >
                 <Play className="mr-2" size={16} />
                 Start Game
@@ -384,12 +432,16 @@ const HiLo = () => {
 
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="bg-casino-background p-2 rounded-lg">
-                <p className="text-xs text-gray-400">Streak</p>
-                <p className="text-base sm:text-lg font-bold text-blue-400">{streak}</p>
+                <p className="text-xs text-gray-400">Current Streak</p>
+                <p className="text-lg font-bold text-blue-400">{streak}</p>
+              </div>
+              <div className="bg-casino-background p-2 rounded-lg">
+                <p className="text-xs text-gray-400">Multiplier</p>
+                <p className="text-lg font-bold text-green-400">{formatNumber(currentMultiplier)}x</p>
               </div>
               <div className="bg-casino-background p-2 rounded-lg">
                 <p className="text-xs text-gray-400">Potential Win</p>
-                <p className="text-base sm:text-lg font-bold text-green-400">{potentialWin}</p>
+                <p className="text-lg font-bold text-yellow-400">{potentialWin}</p>
               </div>
             </div>
           </div>
