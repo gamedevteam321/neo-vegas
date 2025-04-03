@@ -493,8 +493,9 @@ const Wheel = () => {
           Wheel
         </h1>
         
-        <div className="mb-6 flex flex-col md:flex-row gap-4 items-start">
-          <div className="bg-casino-card rounded-xl p-6 w-full md:w-64 flex flex-col gap-4">
+        <div className="game-interface-reverse">
+          {/* Controls Panel */}
+          <div className="game-controls bg-casino-card rounded-xl p-4 md:p-6">
             <div>
               <p className="text-gray-400 text-sm mb-2">Bet Amount</p>
               <div className="flex items-center gap-2">
@@ -596,58 +597,13 @@ const Wheel = () => {
             </Button>
           </div>
           
-          <div className="flex-1 bg-casino-card rounded-xl p-6">
-            {/* Recent multipliers display */}
-            <div className="flex justify-center gap-1.5 mb-4">
-              {recentMultipliers.map((mult, index) => (
-                <div
-                  key={index}
-                  className="px-2 py-1 rounded-md bg-[#1a1d1f] text-white text-sm text-center min-w-[45px] relative"
-                >
-                  <span>{mult.label}</span>
-                  <div 
-                    className="absolute bottom-0 left-0 right-0 h-0.5"
-                    style={{ backgroundColor: mult.color }}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="max-w-md mx-auto">
-              <canvas 
-                ref={canvasRef} 
-                width={400} 
-                height={400} 
-                className="w-full h-full"
-              />
-            </div>
-
-            {/* Color legend */}
-            <div className="flex flex-wrap justify-center gap-4 mt-4">
-              {difficulty === 'hard' ? (
-                <>
-                  {renderLegendItem({
-                    multiplier: 0,
-                    color: "#374151",
-                    label: "0.00x"
-                  })}
-                  {renderLegendItem({
-                    multiplier: (numSegments - 1) * 1.05,
-                    color: "#a855f7",
-                    label: `${((numSegments - 1) * 1.05).toFixed(2)}x`
-                  })}
-                </>
-              ) : (
-                segments
-                  .reduce((unique: WheelSegment[], segment) => 
-                    unique.some(s => s.multiplier === segment.multiplier) 
-                      ? unique 
-                      : [...unique, segment]
-                  , [])
-                  .sort((a, b) => a.multiplier - b.multiplier)
-                  .map((segment) => renderLegendItem(segment))
-              )}
-            </div>
+          {/* Wheel Display */}
+          <div className="game-display bg-casino-card rounded-xl p-4 md:p-6 relative min-h-[400px] md:min-h-[500px]">
+            <canvas 
+              ref={canvasRef} 
+              className="absolute inset-0 w-full h-full"
+              style={{ touchAction: 'none' }}
+            />
           </div>
         </div>
         
@@ -666,6 +622,49 @@ const Wheel = () => {
                 'N/A'}
             </p>
           </div>
+        </div>
+
+        {/* Recent multipliers display */}
+        <div className="flex justify-center gap-1.5 mb-4">
+          {recentMultipliers.map((mult, index) => (
+            <div
+              key={index}
+              className="px-2 py-1 rounded-md bg-[#1a1d1f] text-white text-sm text-center min-w-[45px] relative"
+            >
+              <span>{mult.label}</span>
+              <div 
+                className="absolute bottom-0 left-0 right-0 h-0.5"
+                style={{ backgroundColor: mult.color }}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Color legend */}
+        <div className="flex flex-wrap justify-center gap-4 mt-4">
+          {difficulty === 'hard' ? (
+            <>
+              {renderLegendItem({
+                multiplier: 0,
+                color: "#374151",
+                label: "0.00x"
+              })}
+              {renderLegendItem({
+                multiplier: (numSegments - 1) * 1.05,
+                color: "#a855f7",
+                label: `${((numSegments - 1) * 1.05).toFixed(2)}x`
+              })}
+            </>
+          ) : (
+            segments
+              .reduce((unique: WheelSegment[], segment) => 
+                unique.some(s => s.multiplier === segment.multiplier) 
+                  ? unique 
+                  : [...unique, segment]
+              , [])
+              .sort((a, b) => a.multiplier - b.multiplier)
+              .map((segment) => renderLegendItem(segment))
+          )}
         </div>
 
         {/* How to Play Section - Below Game Board */}

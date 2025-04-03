@@ -390,7 +390,7 @@ const DragonTower = () => {
       <div className="game-layout">
         <h1 className="game-title">Dragon Tower</h1>
         
-        <div className="game-interface">
+        <div className="game-interface-reverse">
           <div className="game-controls bg-casino-card rounded-xl p-4 md:p-6">
             <div className="space-y-4">
               <div>

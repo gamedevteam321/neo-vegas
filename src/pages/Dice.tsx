@@ -259,7 +259,7 @@ const DiceGame = () => {
       <div className="game-layout">
         <h1 className="game-title">Dice</h1>
         
-        <div className="game-interface">
+        <div className="game-interface-reverse">
           <div className="game-controls bg-casino-card rounded-xl p-4 md:p-6">
             <div className="space-y-4">
               <div>
@@ -383,52 +383,85 @@ const DiceGame = () => {
             </div>
           </div>
           
-          <div className="game-display bg-casino-card rounded-xl p-4 md:p-6">
-            <div className="relative h-[100px] md:h-[150px] flex items-center">
-              {/* Gradient background */}
-              <div className="absolute inset-0 rounded-lg overflow-hidden">
-                <div className={`absolute inset-0 ${isRollOver ? 'bg-gradient-to-r from-red-500/50 via-yellow-500/50 to-green-500/50' : 'bg-gradient-to-r from-green-500/50 via-yellow-500/50 to-red-500/50'}`}></div>
-                
-                {/* Target line */}
+          <div className="game-display bg-casino-card rounded-xl p-4 md:p-6 flex flex-col items-center justify-center min-h-[400px]">
+            {/* Main slider container with border */}
+            <div className="relative w-full h-[200px] flex items-center justify-center">
+              {/* Outer border with gradient */}
+              <div className="absolute inset-x-0 h-10 rounded-full bg-[#1a2028]/80">
+                {/* Numbers on the border */}
+                <div className="absolute -top-6 left-0 right-0 flex justify-between px-4 text-white/70 text-sm">
+                  <span>0</span>
+                  <span>25</span>
+                  <span>50</span>
+                  <span>75</span>
+                  <span>100</span>
+                </div>
+
+                {/* Slider track */}
+                <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-3 rounded-full overflow-hidden">
+                  {isRollOver ? (
+                    <div className="absolute inset-0 flex">
+                      <div 
+                        className="h-full bg-[#ff4444]"
+                        style={{ width: `${targetNumber}%` }}
+                      />
+                      <div 
+                        className="h-full bg-[#44ff44]"
+                        style={{ width: `${100 - targetNumber}%` }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 flex">
+                      <div 
+                        className="h-full bg-[#44ff44]"
+                        style={{ width: `${targetNumber}%` }}
+                      />
+                      <div 
+                        className="h-full bg-[#ff4444]"
+                        style={{ width: `${100 - targetNumber}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Interactive slider area - place this before visual elements */}
+                <div className="absolute inset-x-4 -top-3 -bottom-3 z-50">
+                  <Slider
+                    value={[targetNumber]}
+                    min={1}
+                    max={99}
+                    step={1}
+                    onValueChange={handleSetTarget}
+                    disabled={gameActive && isRolling}
+                    className="h-full [&_[role=slider]]:opacity-0 [&_[role=slider]]:w-full [&_[role=slider]]:h-full [&_[role=slider]]:cursor-grab [&_[role=slider]]:active:cursor-grabbing [&_.relative]:opacity-0 [&_[data-orientation=horizontal]]:opacity-0"
+                  />
+                </div>
+
+                {/* Visual handle - purely decorative */}
                 <div 
-                  className="absolute top-0 bottom-0 w-1 bg-blue-400 z-10" 
+                  className="absolute top-1/2 -translate-y-1/2 w-10 h-10 transform -translate-x-1/2 z-40 pointer-events-none" 
                   style={{ left: `${targetNumber}%` }}
-                ></div>
-                
+                >
+                  <div className="w-full h-full bg-[#4488ff] flex items-center justify-center rounded-sm border-2 border-white/80">
+                    <div className="w-5 h-5 flex flex-col justify-center items-center">
+                      <div className="w-full border-t-2 border-white/50 mb-1"></div>
+                      <div className="w-full border-t-2 border-white/50 mb-1"></div>
+                      <div className="w-full border-t-2 border-white/50"></div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Result marker */}
                 {result !== null && (
                   <div 
-                    className={`absolute top-0 bottom-0 w-1 z-20 ${win ? 'bg-green-400' : 'bg-red-400'}`} 
+                    className="absolute -top-4 -translate-y-1/2 transform -translate-x-1/2 z-30"
                     style={{ left: `${result}%` }}
-                  ></div>
+                  >
+                    <div className="w-10 h-10 bg-white clip-hexagon flex items-center justify-center relative border-2 border-white">
+                      <span className={`font-bold text-sm ${win ? 'text-green-500' : 'text-red-500'}`}>{formatNumber(result)}</span>
+                    </div>
+                  </div>
                 )}
-              </div>
-              
-              {/* Slider */}
-              <div className="w-full px-4 md:px-8 z-10">
-                <Slider
-                  value={[targetNumber]}
-                  min={1}
-                  max={99}
-                  step={1}
-                  onValueChange={handleSetTarget}
-                  disabled={gameActive && isRolling}
-                  className="[&_[role=slider]]:h-4 [&_[role=slider]]:w-4 [&_[role=slider]]:bg-blue-400 [&_[role=slider]]:border-2 [&_[role=slider]]:border-white [&_[role=slider]]:shadow-lg [&_[role=slider]]:cursor-pointer [&_[role=slider]]:hover:bg-blue-500 [&_[role=slider]]:focus:ring-2 [&_[role=slider]]:focus:ring-blue-400 [&_[role=slider]]:focus:ring-offset-2 [&_[role=slider]]:focus:ring-offset-casino-card [&_[role=slider]]:transition-all [&_[role=slider]]:duration-200"
-                />
-                <div className="text-center mt-4">
-                  <span className="text-white font-medium text-lg">Target: {formatNumber(targetNumber)}</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-col items-center justify-center py-4">
-              <div className="text-xl font-bold mb-2 flex items-center text-white">
-                {isRollOver ? (
-                  <ArrowUp className="text-green-400 mr-2 w-6 h-6" />
-                ) : (
-                  <ArrowDown className="text-green-400 mr-2 w-6 h-6" />
-                )}
-                Roll {isRollOver ? 'Over' : 'Under'} {formatNumber(targetNumber)}
               </div>
             </div>
           </div>
